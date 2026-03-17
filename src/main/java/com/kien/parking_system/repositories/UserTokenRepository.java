@@ -12,6 +12,15 @@ import java.util.Optional;
 @Repository
 public interface UserTokenRepository extends JpaRepository<UserToken, Long> {
 
+    @Query(
+            value = "SELECT user_id " +
+                    "FROM users AS u " +
+                    "INNER JOIN user_tokens AS t ON t.user_id = u.id "+
+                    "WHERE u.email = :indetifier OR u.phoneNumber = :indetifier"
+                    , nativeQuery = true
+    )
+    List<UserToken> getTokensByUserName(@Param("identifier")String indetifier);
+
     @Query(value = "SELECT * FROM user_tokens WHERE token = :token",
             nativeQuery = true)
     Optional<UserToken> findByToken(@Param("token") String token);

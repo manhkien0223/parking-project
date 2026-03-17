@@ -11,6 +11,8 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
+
+
     @Query(value = "SELECT EXISTS(SELECT * FROM users WHERE email = :email)",
             nativeQuery = true)
     Boolean existsUserByEmail(@Param("email") String email);

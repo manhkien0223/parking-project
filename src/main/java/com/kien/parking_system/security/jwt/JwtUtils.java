@@ -14,7 +14,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.WebUtils;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Date;
 
 @Component
@@ -30,7 +30,7 @@ public class JwtUtils {
     @Value("${parking.app.RefreshTokenExpirationDays}")
     private int refreshTokenExpirationDays;
 
-    @Value("${parking.app.AccesssCookieName}")
+    @Value("${parking.app.AccessCookieName}") // Đã sửa lỗi dư 1 chữ 's'
     private String accessCookieName;
 
     @Value("${parking.app.RefreshCookieName}")
@@ -52,11 +52,12 @@ public class JwtUtils {
 
     //  Tạo refreshCookie(container chứa refresh token)
     public ResponseCookie generateRefreshCookie(String refreshToken) {
-        return generateCookie(refreshCookieName, refreshToken, "/api/auth/refreshtoken", refreshTokenExpirationDays);
+        int maxAgeInSeconds = refreshTokenExpirationDays * 24 * 60 * 60;
+        return generateCookie(refreshCookieName, refreshToken, "/api/auth/refreshtoken", maxAgeInSeconds);
     }
 
     // Hàm này dành cho AuthTokenFilter dùng để lấy Access Token
-    public String getAccesTokenfromCookies(HttpServletRequest request) {
+    public String getAccessTokenfromCookie(HttpServletRequest request) {
         return getCookiesByTokenName(request, accessCookieName);
     }
 
@@ -65,14 +66,26 @@ public class JwtUtils {
         return getCookiesByTokenName(request, refreshCookieName);
     }
 
-    private Key key() {
+    public String getUsernameFromAccessToken(String token) {
+        // Cú pháp mới của bản 0.12.x
+        return Jwts.parser()
+                .verifyWith(key())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
+    }
+
+    // Cú pháp mới: Trả về SecretKey thay vì Key
+    private SecretKey key() {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey));
     }
 
     //  Validate Token
     public boolean validateAccessToken(String authToken) {
         try {
-            Jwts.parserBuilder().setSigningKey(key()).build().parse(authToken);
+            // Cú pháp mới của bản 0.12.x
+            Jwts.parser().verifyWith(key()).build().parseSignedClaims(authToken);
             return true;
         } catch (MalformedJwtException e) {
             logger.error("Invalid JWT token: {}", e.getMessage());
@@ -95,12 +108,12 @@ public class JwtUtils {
                 .getAuthority();
 
         return Jwts.builder()
-                .setSubject(userDetails.getUsername())
+                .subject(userDetails.getUsername()) // Bản mới lược bỏ chữ 'set'
                 .claim("id", userDetails.getId())
                 .claim("role", role)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + (accessTokenExpirationSeconds * 1000L)))
-                .signWith(key(), SignatureAlgorithm.HS256)
+                .issuedAt(new Date())               // Bản mới lược bỏ chữ 'set'
+                .expiration(new Date((new Date()).getTime() + (accessTokenExpirationSeconds * 1000L))) // Bản mới lược bỏ chữ 'set'
+                .signWith(key())                    // Bản mới tự động nhận diện thuật toán
                 .compact();
     }
 
@@ -109,7 +122,7 @@ public class JwtUtils {
                 .path(path)
                 .maxAge(maxAge)
                 .httpOnly(true)
-                .secure(false)
+                .secure(false) // Nhớ đổi thành true khi deploy lên host có HTTPS
                 .build();
     }
 
